@@ -1,0 +1,2148 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>實時互動摸頭</title>
+    <script src="https://cdn.jsdelivr.net/npm/gif.js/dist/gif.js"></script>
+    <style>
+        :root {
+            --bg-base: #0f0f11;
+            --bg-panel: #18181b;
+            --bg-control: #27272a;
+            --bg-hover: #3f3f46;
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --border-color: #27272a;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --danger-color: #ef4444;
+            --success-color: #10b981;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overscroll-behavior: none;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            box-sizing: border-box;
+            min-height: 100vh;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-base);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-control);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--bg-hover);
+        }
+
+        .app-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 40px;
+            max-width: 960px;
+            width: 100%;
+            align-items: flex-start;
+            justify-content: center;
+        }
+
+        /* Language Switcher */
+        .lang-switch {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-control);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        /* Left Panel */
+        .left-panel {
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: sticky;
+            top: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            width: 100%;
+        }
+
+        h1 {
+            margin: 0 0 8px 0;
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        #playground {
+            position: relative;
+            width: 250px;
+            height: 250px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            background-color: var(--bg-panel);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            cursor: none;
+            overflow: hidden;
+            -webkit-touch-callout: none;
+            user-select: none;
+            margin-bottom: 20px;
+        }
+
+        #petTarget {
+            width: 200px;
+            height: 200px;
+            border-radius: 8px;
+            transform-origin: bottom center;
+            pointer-events: none;
+            will-change: transform;
+            /* 移除 overflow: hidden; 讓長圖片不會被 200x200 框框斷頭斷腳 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #petImageInner {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            will-change: transform;
+        }
+
+        #handContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: none;
+            overflow: hidden;
+            will-change: transform;
+            clip-path: inset(0 2px);
+        }
+
+        #handSprite {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 500%;
+            max-width: none;
+            pointer-events: none;
+            image-rendering: pixelated;
+            will-change: transform;
+        }
+
+        #status {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        /* Edit Mode Switch */
+        .switch-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: transparent;
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            width: 100%;
+            max-width: 250px;
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .switch-container:hover {
+            border-color: var(--text-muted);
+        }
+
+        .switch-container.active {
+            border-color: var(--accent-color);
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+
+        .switch-text {
+            font-weight: 500;
+            font-size: 14px;
+            color: var(--text-main);
+            user-select: none;
+        }
+
+        .switch-container.active .switch-text {
+            color: var(--accent-color);
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 36px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-control);
+            transition: .3s;
+            border-radius: 20px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--text-muted);
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--accent-color);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(16px);
+            background-color: white;
+        }
+
+        /* Right Panel */
+        .right-panel {
+            flex: 1;
+            min-width: 320px;
+            max-width: 380px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .control-card {
+            background-color: var(--bg-panel);
+            padding: 20px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .control-card h3 {
+            margin: 0 0 4px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .upload-btn {
+            background-color: var(--bg-control);
+            color: var(--text-main);
+            padding: 10px 14px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: block;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        .upload-btn:hover:not(:disabled) {
+            background-color: var(--bg-hover);
+            border-color: var(--text-muted);
+        }
+
+        .upload-btn.success {
+            border-color: var(--success-color);
+            color: var(--success-color);
+        }
+
+        .upload-btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* Segmented Control for Export Format */
+        .segmented-control {
+            display: flex;
+            background: var(--bg-control);
+            padding: 4px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+        }
+
+        .segment-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .segment-btn:hover {
+            color: var(--text-main);
+        }
+
+        .segment-btn.active {
+            background: var(--bg-hover);
+            color: var(--text-main);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        #adjustTools {
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .slider-row label {
+            font-size: 12px;
+            color: var(--text-muted);
+            width: 65px;
+            flex-shrink: 0;
+        }
+
+        .slider-row input[type="range"] {
+            flex: 1;
+            cursor: pointer;
+            accent-color: var(--accent-color);
+            height: 4px;
+            background: var(--bg-control);
+            border-radius: 2px;
+            appearance: none;
+            -webkit-appearance: none;
+            outline: none;
+        }
+
+        .slider-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--text-main);
+            cursor: pointer;
+        }
+
+        /* 數值顯示器樣式 */
+        .val-display {
+            font-size: 12px;
+            color: var(--accent-color);
+            width: 36px;
+            text-align: right;
+            font-family: monospace;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .radio-group {
+            display: flex;
+            justify-content: flex-start;
+            gap: 20px;
+            margin-bottom: 4px;
+        }
+
+        .radio-group label {
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-muted);
+        }
+
+        .radio-group input[type="radio"] {
+            cursor: pointer;
+            margin: 0;
+            accent-color: var(--accent-color);
+        }
+
+        /* 同步與重置按鈕列 */
+        .action-buttons-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            background: var(--bg-hover);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 6px 4px;
+            font-size: 11px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .action-btn:hover {
+            background: var(--text-muted);
+            color: var(--bg-base);
+        }
+
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            margin-top: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .checkbox-label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .checkbox-label:hover {
+            color: var(--text-main);
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            cursor: pointer;
+            accent-color: var(--accent-color);
+        }
+
+        /* Record Button */
+        #btnToggleRecord {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        #btnToggleRecord:hover:not(:disabled) {
+            background-color: var(--accent-hover);
+        }
+
+        #btnToggleRecord:disabled {
+            background-color: var(--bg-hover) !important;
+            color: var(--text-muted) !important;
+            cursor: not-allowed !important;
+            border-color: var(--border-color) !important;
+            opacity: 0.6;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        .recording {
+            background-color: var(--danger-color) !important;
+            animation: pulse 1.5s infinite;
+            border-color: var(--danger-color) !important;
+            color: white !important;
+        }
+
+        #renderCanvas {
+            position: fixed;
+            top: -9999px;
+            left: -9999px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* ==================================================
+           【防呆機制】 錄影與處理中鎖定狀態 
+           ================================================== */
+        body.is-recording .switch-container,
+        body.is-recording .control-card .upload-btn:not(#btnToggleRecord),
+        body.is-recording .segmented-control,
+        body.is-recording .checkbox-container,
+        body.is-recording .lang-switch,
+        body.is-recording #adjustTools,
+        body.is-recording .slider-row,
+        body.is-recording .action-buttons-row {
+            opacity: 0.4;
+            pointer-events: none !important;
+            cursor: not-allowed !important;
+            filter: grayscale(100%);
+        }
+
+        body.is-recording .right-panel .control-card {
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+
+        /* 渲染遮罩與進度條 */
+        #renderOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(15, 15, 17, 0.9);
+            z-index: 10000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .render-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #fff;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .render-warning {
+            font-size: 14px;
+            color: #ef4444;
+            margin-bottom: 30px;
+            font-weight: bold;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .progress-container {
+            width: 80%;
+            max-width: 400px;
+            background-color: #27272a;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 24px;
+            position: relative;
+            border: 1px solid var(--border-color);
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: var(--accent-color);
+            transition: width 0.1s linear;
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            line-height: 24px;
+            font-size: 13px;
+            font-weight: bold;
+            color: white;
+            mix-blend-mode: difference;
+        }
+
+        /* 🌟 開場互動閘門 (Interaction Gate) */
+        #welcomeGate {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(15, 15, 17, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 20000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
+
+        .welcome-card {
+            background-color: var(--bg-panel);
+            padding: 40px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+            text-align: center;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.6);
+            max-width: 90%;
+            width: 400px;
+        }
+
+        .welcome-title {
+            margin: 0 0 10px 0;
+            font-size: 22px;
+            color: white;
+        }
+
+        .welcome-subtitle {
+            margin: 0 0 30px 0;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .lang-btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .lang-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: var(--radius-md);
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .lang-btn:hover {
+            background-color: var(--accent-hover);
+            transform: scale(1.02);
+        }
+
+        @media (max-width: 768px) {
+            .left-panel {
+                position: static;
+            }
+
+            .app-container {
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 🌟 開場閘門 (Interaction Gate) -->
+    <div id="welcomeGate">
+        <div class="welcome-card">
+            <h2 class="welcome-title">Language / 語言 / 言語</h2>
+            <p class="welcome-subtitle">Please select a language to start<br>(Unlocks audio engine)</p>
+            <div class="lang-btn-group">
+                <button class="lang-btn" data-lang="tw">繁體中文</button>
+                <button class="lang-btn" data-lang="en">English</button>
+                <button class="lang-btn" data-lang="ja">日本語</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 渲染進度遮罩 -->
+    <div id="renderOverlay">
+        <div class="render-title" data-i18n="renderTitle">🎥 正在渲染高畫質檔案中...</div>
+        <div class="render-warning" data-i18n="renderWarning">⚠️ 請勿切換分頁或關閉瀏覽器，以免輸出中斷。</div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
+            <div class="progress-text" id="progressText">0%</div>
+        </div>
+    </div>
+
+    <select class="lang-switch" id="langSwitch">
+        <option value="tw">繁體中文</option>
+        <option value="en">English</option>
+        <option value="ja">日本語</option>
+    </select>
+
+    <div class="app-container">
+        <!-- ================= Left Panel ================= -->
+        <div class="left-panel">
+            <div class="header">
+                <h1 data-i18n="title">實時互動摸頭</h1>
+                <p data-i18n="subtitle">上傳圖片，自訂位置，實時把玩並匯出 1080p 影片與原色動圖</p>
+            </div>
+
+            <div id="playground">
+                <div id="petTarget">
+                    <img id="petImageInner" alt="Target">
+                </div>
+                <div id="handContainer">
+                    <img id="handSprite" src="" alt="Hand Sprite">
+                </div>
+            </div>
+
+            <label class="switch-container" id="adjustSwitchContainer">
+                <span class="switch-text" id="adjustSwitchText" data-i18n="editMode">編輯模式</span>
+                <div class="switch">
+                    <input type="checkbox" id="adjustModeCheck">
+                    <span class="slider"></span>
+                </div>
+            </label>
+
+            <div id="status" data-i18n="statusWait">請上傳素材以開始</div>
+        </div>
+
+        <!-- ================= Right Panel ================= -->
+        <div class="right-panel">
+
+            <div class="control-card">
+                <h3 data-i18n="assets">素材</h3>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label for="idleImageUpload" class="upload-btn" id="btnIdleFace" style="flex: 1;"
+                        data-i18n="idleImg">靜止圖片</label>
+                    <input type="file" id="idleImageUpload" accept="image/*">
+
+                    <button id="btnSwapImages" class="upload-btn"
+                        style="flex: 0 0 auto; width: 40px; padding: 10px 0; display: flex; justify-content: center; align-items: center;"
+                        title="交換圖片" data-i18n-title="swapImg">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m15 14 5-5-5-5" />
+                            <path d="M20 9H4" />
+                            <path d="m9 10-5 5 5 5" />
+                            <path d="M4 15h16" />
+                        </svg>
+                    </button>
+
+                    <label for="activeImageUpload" class="upload-btn" id="btnActiveFace" style="flex: 1;"
+                        data-i18n="activeImg">被摸圖片</label>
+                    <input type="file" id="activeImageUpload" accept="image/*">
+                </div>
+            </div>
+
+            <div class="control-card">
+                <h3>
+                    <span data-i18n="adjustments">位置微調</span>
+                </h3>
+
+                <div id="adjustTools">
+                    <div class="radio-group">
+                        <label><input type="radio" name="adjustTargetRadio" value="idle" checked> <span
+                                data-i18n="stateIdle">靜止時</span></label>
+                        <label><input type="radio" name="adjustTargetRadio" value="active"> <span
+                                data-i18n="stateActive">被摸時</span></label>
+                    </div>
+
+                    <!-- 重置與同步按鈕列 -->
+                    <div class="action-buttons-row">
+                        <button type="button" id="btnResetAdjust" class="action-btn"
+                            data-i18n="resetAdjust">重置目前數值</button>
+                        <button type="button" id="btnSyncToOther" class="action-btn"></button>
+                        <button type="button" id="btnSyncFromOther" class="action-btn"></button>
+                    </div>
+
+                    <div class="slider-row">
+                        <label data-i18n="size">大小</label>
+                        <input type="range" id="scaleSlider" min="0.5" max="3" step="0.05" value="1">
+                        <span class="val-display" id="val-scale">1.00</span>
+                    </div>
+                    <div class="slider-row">
+                        <label data-i18n="posX">左右</label>
+                        <input type="range" id="xSlider" min="-1000" max="1000" step="1" value="0">
+                        <span class="val-display" id="val-x">0</span>
+                    </div>
+                    <div class="slider-row">
+                        <label data-i18n="posY">上下</label>
+                        <input type="range" id="ySlider" min="-1000" max="1000" step="1" value="0">
+                        <span class="val-display" id="val-y">0</span>
+                    </div>
+
+                    <div class="slider-row" style="margin-top: 8px;">
+                        <label data-i18n="handSize">手部大小</label>
+                        <input type="range" id="handScaleSlider" min="0.1" max="2" step="0.01" value="1">
+                        <span class="val-display" id="val-handScale">1.00</span>
+                    </div>
+
+                    <div class="slider-row">
+                        <label data-i18n="handPosX">手部左右</label>
+                        <input type="range" id="handXSlider" min="-1000" max="1000" step="1" value="0">
+                        <span class="val-display" id="val-handX">0</span>
+                    </div>
+                    <div class="slider-row">
+                        <label data-i18n="handPosY">手部上下</label>
+                        <input type="range" id="handYSlider" min="-1000" max="1000" step="1" value="0">
+                        <span class="val-display" id="val-handY">0</span>
+                    </div>
+
+                    <div class="slider-row" style="margin-top: 8px;">
+                        <label data-i18n="squish">擠壓強度</label>
+                        <input type="range" id="squishSlider" min="0" max="2" step="0.05" value="1">
+                        <span class="val-display" id="val-squish">1.00</span>
+                    </div>
+
+                    <div class="slider-row">
+                        <label data-i18n="speed">摸頭速度</label>
+                        <input type="range" id="speedSlider" min="0.3" max="3" step="0.01" value="1">
+                        <span class="val-display" id="val-speed">1.00</span>
+                    </div>
+
+                    <div class="checkbox-container">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="keepRatioCheck">
+                            <span data-i18n="keepRatio">保持原圖比例 (不裁切)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="adjustTip" style="font-size: 13px; color: var(--text-muted); padding: 5px 0;"
+                    data-i18n="statusAdjustTip">
+                    開啟左側編輯模式以解鎖控制項
+                </div>
+            </div>
+
+            <div class="control-card">
+                <h3 data-i18n="exportSet">匯出設定</h3>
+
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label for="audioUpload" class="upload-btn" id="btnAudio" data-i18n="uploadAudio"
+                        style="flex: 1;">背景音樂 (選填)</label>
+                    <input type="file" id="audioUpload" accept="audio/*">
+                    <button type="button" id="btnRemoveAudio" class="upload-btn"
+                        style="flex: 0 0 auto; display: none; width: 40px; padding: 10px 0; justify-content: center; align-items: center; background-color: var(--danger-color); border-color: var(--danger-color);"
+                        title="移除音樂" data-i18n-title="removeAudio">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 6h18" />
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="segmented-control" id="formatToggle">
+                    <button class="segment-btn active" data-value="webm" data-i18n="formatWebmShort">影片 (WebM)</button>
+                    <button class="segment-btn" data-value="gif" data-i18n="formatGifShort">動圖 (GIF)</button>
+                </div>
+
+                <div class="slider-row" style="margin-top: 10px; margin-bottom: 4px;">
+                    <label data-i18n="bgmVolume">音樂音量</label>
+                    <input type="range" id="volumeSlider" min="0" max="100" step="1" value="35">
+                    <span class="val-display" id="volumeDisplay" style="width: 36px; text-align: right;">35%</span>
+                </div>
+
+                <div class="slider-row" style="margin-top: 10px; margin-bottom: 4px;">
+                    <label data-i18n="maxRecordTime">錄影限時(秒)</label>
+                    <input type="range" id="maxTimeSlider" min="5" max="30" step="1" value="15">
+                    <span id="maxTimeDisplay"
+                        style="font-size: 13px; color: var(--text-muted); width: 24px; text-align: right;">15</span>
+                </div>
+
+                <div class="checkbox-container">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="autoStopCheck">
+                        <span data-i18n="autoStop">音樂結束時自動停止</span>
+                    </label>
+                </div>
+
+                <button id="btnToggleRecord" class="upload-btn">開始錄製</button>
+            </div>
+
+        </div>
+    </div>
+
+    <audio id="bgmAudio"></audio>
+    <!-- 將算圖畫布放大到 1080p 超高解析度 (供影片使用) -->
+    <canvas id="renderCanvas" width="1080" height="1080"></canvas>
+
+    <script>
+        const MY_CUSTOM_HAND_SPRITE = "./sprite.png";
+
+        // === i18n Translations ===
+        const translations = {
+            tw: {
+                title: "實時互動摸頭", subtitle: "上傳圖片，自訂位置，實時把玩並匯出 1080p 影片與原色動圖",
+                editMode: "編輯模式", doneEdit: "完成編輯",
+                assets: "素材", idleImg: "靜止圖片", activeImg: "被摸圖片", swapImg: "交換圖片",
+                adjustments: "位置微調", stateIdle: "靜止時", stateActive: "被摸時",
+                resetAdjust: "重置目前數值", syncToActive: "同步給【被摸時】", syncToIdle: "同步給【靜止時】", syncFromActive: "從【被摸時】拷貝", syncFromIdle: "從【靜止時】拷貝",
+                size: "大小", posX: "左右偏移", posY: "上下偏移",
+                handSize: "手部大小", handPosX: "手部左右", handPosY: "手部上下",
+                squish: "擠壓強度", speed: "摸頭速度", keepRatio: "保持原圖比例 (不裁切)",
+                exportSet: "匯出設定", uploadAudio: "背景音樂 (選填)", removeAudio: "移除音樂", bgmVolume: "音樂音量",
+                formatWebmShort: "影片 (WebM)", formatGifShort: "動圖 (GIF)",
+                maxRecordTime: "錄影限時(秒)",
+                autoStop: "音樂結束時自動停止錄製", startRecord: "開始錄製", stopRecord: "停止並匯出", recordDisabled: "請先完成編輯",
+                statusWait: "請上傳素材以開始", statusReady: "準備就緒，請將游標移至圖片上",
+                statusAdjustTip: "開啟左側編輯模式以解鎖控制項", statusAdjust: "編輯中：拖曳圖片，滾輪縮放",
+                statusRecord: "錄製中... 自由發揮吧！", statusProcessGif: "正在處理 480p 原色完美 GIF...",
+                statusProcessWebm: "正在渲染 1080p WebM 影片...", statusDone: "輸出完成！已經為您自動下載。",
+                renderTitle: "🎥 正在渲染高畫質檔案中...", renderWarning: "⚠️ 請勿切換分頁或關閉瀏覽器，以免輸出中斷。"
+            },
+            en: {
+                title: "Real-time Petpet", subtitle: "Upload images, adjust position, interact in real-time, export 1080p Video & original color GIF.",
+                editMode: "Edit Mode", doneEdit: "Done Editing",
+                assets: "Assets", idleImg: "Idle Image", activeImg: "Active Image", swapImg: "Swap images",
+                adjustments: "Adjustments", stateIdle: "Idle", stateActive: "Active",
+                resetAdjust: "Reset Current", syncToActive: "Sync to Active", syncToIdle: "Sync to Idle", syncFromActive: "Copy from Active", syncFromIdle: "Copy from Idle",
+                size: "Scale", posX: "X Offset", posY: "Y Offset",
+                handSize: "Hand Scale", handPosX: "Hand X Offset", handPosY: "Hand Y Offset",
+                squish: "Squish Power", speed: "Speed", keepRatio: "Keep Original Aspect Ratio",
+                exportSet: "Export Settings", uploadAudio: "Background Music (Optional)", removeAudio: "Remove Music", bgmVolume: "Music Volume",
+                formatWebmShort: "Video (WebM)", formatGifShort: "Animation (GIF)",
+                maxRecordTime: "Time Limit (s)",
+                autoStop: "Auto-stop when music ends", startRecord: "Start Recording", stopRecord: "Stop & Export", recordDisabled: "Finish editing first",
+                statusWait: "Please upload assets to begin.", statusReady: "Ready. Move cursor over the image.",
+                statusAdjustTip: "Enable Edit Mode on the left to unlock controls.", statusAdjust: "Editing: Drag to move, scroll to zoom.",
+                statusRecord: "Recording... interact with the image!", statusProcessGif: "Processing 480p original color GIF...",
+                statusProcessWebm: "Rendering 1080p WebM video...", statusDone: "Done! File downloaded automatically.",
+                renderTitle: "🎥 Rendering high-quality file...", renderWarning: "⚠️ Do not switch tabs or close the browser to avoid rendering failure."
+            },
+            ja: {
+                title: "リアルタイムなでなで", subtitle: "画像をアップロード、位置を調整、リアルタイムでなでて1080p動画とGIFを出力",
+                editMode: "編集モード", doneEdit: "編集完了",
+                assets: "素材", idleImg: "待機画像", activeImg: "なでられ画像", swapImg: "画像を入れ替える",
+                adjustments: "位置調整", stateIdle: "待機時", stateActive: "なでられ時",
+                resetAdjust: "現在をリセット", syncToActive: "「なでられ時」に同期", syncToIdle: "「待機時」に同期", syncFromActive: "「なでられ時」からコピー", syncFromIdle: "「待機時」からコピー",
+                size: "サイズ", posX: "X座標", posY: "Y座標",
+                handSize: "手のサイズ", handPosX: "手のX座標", handPosY: "手のY座標",
+                squish: "つぶれ具合", speed: "なでる速度", keepRatio: "元のアスペクト比を保持",
+                exportSet: "出力設定", uploadAudio: "BGM (任意)", removeAudio: "音楽を削除", bgmVolume: "BGM 音量",
+                formatWebmShort: "動画 (WebM)", formatGifShort: "動図 (GIF)",
+                maxRecordTime: "録画制限(秒)",
+                autoStop: "音楽終了時に自動停止", startRecord: "録画開始", stopRecord: "停止して出力", recordDisabled: "先に編集を完了してください",
+                statusWait: "素材をアップロードしてください", statusReady: "準備完了。画像にカーソルを合わせます",
+                statusAdjustTip: "左側の編集モードを有効にして操作のロックを解除します", statusAdjust: "編集中: ドラッグで移動、スクロールでズーム",
+                statusRecord: "録画中...自由に動かしてください！", statusProcessGif: "480p 原色保持・高品質GIFを処理中...",
+                statusProcessWebm: "1080p WebM動画をレンダリング中...", statusDone: "完了！自動的にダウンロードされました。",
+                renderTitle: "🎥 高画質ファイルをレンダリング中...", renderWarning: "⚠️ レンダリングの失敗を防ぐため、タブを切り替えたりブラウザを閉じたりしないでください。"
+            }
+        };
+
+        // === 1. DOM 元素選取 ===
+        const petTarget = document.getElementById('petTarget');
+        const petImageInner = document.getElementById('petImageInner');
+        const handContainer = document.getElementById('handContainer');
+        const handSprite = document.getElementById('handSprite');
+        const playground = document.getElementById('playground');
+        const status = document.getElementById('status');
+        const bgmAudio = document.getElementById('bgmAudio');
+        const btnToggleRecord = document.getElementById('btnToggleRecord');
+        const autoStopCheck = document.getElementById('autoStopCheck');
+        const maxTimeSlider = document.getElementById('maxTimeSlider');
+        const maxTimeDisplay = document.getElementById('maxTimeDisplay');
+        const adjustSwitchContainer = document.getElementById('adjustSwitchContainer');
+        const adjustSwitchText = document.getElementById('adjustSwitchText');
+        const adjustModeCheck = document.getElementById('adjustModeCheck');
+        const adjustTools = document.getElementById('adjustTools');
+        const adjustTip = document.getElementById('adjustTip');
+        const scaleSlider = document.getElementById('scaleSlider');
+        const xSlider = document.getElementById('xSlider');
+        const ySlider = document.getElementById('ySlider');
+        const adjustRadios = document.querySelectorAll('input[name="adjustTargetRadio"]');
+        const keepRatioCheck = document.getElementById('keepRatioCheck');
+        const handScaleSlider = document.getElementById('handScaleSlider');
+        const handXSlider = document.getElementById('handXSlider');
+        const handYSlider = document.getElementById('handYSlider');
+        const speedSlider = document.getElementById('speedSlider');
+        const squishSlider = document.getElementById('squishSlider');
+        const btnResetAdjust = document.getElementById('btnResetAdjust');
+        const btnSyncToOther = document.getElementById('btnSyncToOther');
+        const btnSyncFromOther = document.getElementById('btnSyncFromOther');
+        const renderOverlay = document.getElementById('renderOverlay');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeDisplay = document.getElementById('volumeDisplay');
+
+        // === 2. 全域變數宣告 ===
+        let currentLang = 'tw';
+        let maxRecordTime = 15000;
+        let recordInterval = null;
+        let selectedFormat = 'webm';
+        let currentAdjustTarget = 'idle';
+        let isSpriteLoaded = false;
+        let isAudioLoaded = false;
+        let flipMultiplier = 1;
+        let smoothedFlip = 1;
+        let lastMouseSide = null;
+        let sessionLog = [];
+        let recordStartTime = 0;
+        let isRecording = false;
+        let isPetting = false;
+        let renderReq = null;
+        let currentFrame = 0;
+        let lastFrameTime = 0;
+        let isAdjustMode = false;
+        let isDragging = false;
+        let dragStartX = 0, dragStartY = 0;
+        let startOffsetX = 0, startOffsetY = 0;
+        let initialDistance = 0, initialScale = 1;
+        let bgmLoopTimeout = null;
+        let isInBgmGap = false;
+        let isBackgroundRendering = false;
+        let isStoppedByAudioEnd = false;
+        let uploadedIdleUrl = null;
+        let uploadedActiveUrl = null;
+        let uploadedAudioUrl = null;
+        let lastGeneratedWebmUrl = null;
+        let lastGeneratedGifUrl = null;
+        let audioCtx, audioSourceNode, gainNode;
+        let workerBlobUrl = null;
+        let currentVolume = 0.35;
+
+        // ==========================================
+        // 🛠️ 開發者專屬：預設存檔設定區
+        // ==========================================
+        // 1. 預設圖片與音樂設定 (根據您上傳的檔案名稱修正副檔名)
+        const DEFAULT_IDLE_IMG = "./預設.png";
+        const DEFAULT_ACTIVE_IMG = "./誇獎2.png";
+        const DEFAULT_BGM = "好癢.ogg";
+
+        // 📝 建立完美數值的「備份檔」，供重置按鈕使用
+        const BACKUP_IDLE_ADJUST = { scale: 3.00, x: -10, y: 154, keepRatio: true };
+        const BACKUP_ACTIVE_ADJUST = { scale: 3.00, x: -10, y: 154, keepRatio: true };
+        const BACKUP_HAND = { scale: 0.48, x: -1, y: -57 };
+        const BACKUP_ANIMATION = { squish: 0.25, speed: 1.00 };
+
+        // 2. 靜止時的圖片位置與大小
+        let idleAdjust = { ...BACKUP_IDLE_ADJUST };
+
+        // 3. 被摸時的圖片位置與大小
+        let activeAdjust = { ...BACKUP_ACTIVE_ADJUST };
+
+        // 4. 手套的預設位置與大小 (全局通用)
+        let handScale = BACKUP_HAND.scale;
+        let handX = BACKUP_HAND.x;
+        let handY = BACKUP_HAND.y;
+
+        // 5. 動畫參數
+        let squishIntensity = BACKUP_ANIMATION.squish; // 擠壓強度
+        let petSpeed = BACKUP_ANIMATION.speed;        // 摸頭速度
+        // ==========================================
+
+        // === 3. 初始化影像物件 ===
+        const idleImgObj = new Image(); const activeImgObj = new Image(); const handSpriteObj = new Image();
+        idleImgObj.src = DEFAULT_IDLE_IMG;
+        activeImgObj.src = DEFAULT_ACTIVE_IMG;
+        petImageInner.src = DEFAULT_IDLE_IMG;
+        bgmAudio.volume = currentVolume; // 初始化時套用預設音量
+
+        // === 4. 功能函式與事件綁定 ===
+        const t = (key) => translations[currentLang][key];
+
+        function updateTexts() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[currentLang][key]) el.innerText = t(key);
+            });
+            document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                const key = el.getAttribute('data-i18n-title');
+                if (translations[currentLang][key]) el.title = t(key);
+            });
+
+            updateStatusText();
+            updateSyncButtonsText();
+            adjustSwitchText.innerText = isAdjustMode ? t('doneEdit') : t('editMode');
+
+            if (isAdjustMode) {
+                btnToggleRecord.innerText = t('recordDisabled');
+                btnToggleRecord.disabled = true;
+            } else {
+                if (!isRecording) btnToggleRecord.innerText = t('startRecord');
+                btnToggleRecord.disabled = false;
+            }
+
+            // 🌟 修正 Bug：語系切換時，如果音樂已載入，要保留正確的按鈕狀態！
+            if (isAudioLoaded) {
+                document.getElementById('btnAudio').innerText = currentLang === 'tw' ? "音樂已載入 🎵" : (currentLang === 'en' ? "Music Loaded 🎵" : "音楽がロードされました 🎵");
+            }
+        }
+
+        // 🌟 開場互動閘門邏輯
+        const welcomeGate = document.getElementById('welcomeGate');
+        const langBtns = document.querySelectorAll('.lang-btn');
+
+        langBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                // 1. 設定語言
+                const selectedLang = e.target.getAttribute('data-lang');
+                currentLang = selectedLang;
+                document.getElementById('langSwitch').value = selectedLang;
+                updateTexts();
+
+                // 2. 解鎖音效引擎 (Silent Play-Pause Trick)
+                if (DEFAULT_BGM.trim() !== "") {
+                    // 初始化 AudioContext
+                    initAudioEngine();
+                    // 強制偷播 0.01 秒然後暫停，徹底騙過瀏覽器解鎖音效限制！
+                    bgmAudio.play().then(() => {
+                        bgmAudio.pause();
+                        bgmAudio.currentTime = 0;
+                    }).catch(() => {
+                        // iOS/Safari 偶爾會有特殊的 play() Promise reject，忽略即可
+                    });
+                }
+
+                // 3. 隱藏開場視窗
+                welcomeGate.style.opacity = '0';
+                setTimeout(() => {
+                    welcomeGate.style.display = 'none';
+                }, 400);
+            });
+        });
+
+        document.getElementById('langSwitch').addEventListener('change', (e) => {
+            currentLang = e.target.value;
+            updateTexts();
+        });
+
+        volumeSlider.addEventListener('input', e => {
+            const vol = parseInt(e.target.value);
+            volumeDisplay.innerText = vol + '%';
+            currentVolume = vol / 100;
+            bgmAudio.volume = currentVolume;
+            if (gainNode) {
+                gainNode.gain.value = currentVolume;
+            }
+        });
+
+        maxTimeSlider.addEventListener('input', e => {
+            maxTimeDisplay.innerText = e.target.value;
+            maxRecordTime = parseInt(e.target.value) * 1000;
+        });
+
+        const formatBtns = document.querySelectorAll('.segment-btn');
+        formatBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                formatBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedFormat = btn.getAttribute('data-value');
+
+                let currentVal = parseInt(maxTimeSlider.value);
+
+                if (selectedFormat === 'gif') {
+                    maxTimeSlider.max = 15;
+                    if (currentVal > 15 || maxRecordTime > 15000) {
+                        maxTimeSlider.value = 15;
+                        maxTimeDisplay.innerText = "15";
+                        maxRecordTime = 15000;
+                    }
+                } else {
+                    maxTimeSlider.max = 30;
+                }
+            });
+        });
+
+        handSpriteObj.crossOrigin = "anonymous";
+        handSpriteObj.onload = () => {
+            handSprite.src = handSpriteObj.src;
+            isSpriteLoaded = true;
+            updateStatusText();
+            if (isAdjustMode) {
+                handContainer.style.display = 'block';
+                handContainer.style.opacity = '0.7';
+            }
+        };
+        handSpriteObj.onerror = () => {
+            console.warn(`無法載入 ${MY_CUSTOM_HAND_SPRITE}。請確認圖片路徑。`);
+        };
+        handSpriteObj.src = MY_CUSTOM_HAND_SPRITE;
+
+        function updateHandTransformStatic() {
+            // 直接使用全局手部變數
+            handContainer.style.transform = `translate(${handX * smoothedFlip}px, ${handY}px) scale(${smoothedFlip * 1.02 * handScale}, ${1.02 * handScale})`;
+        }
+
+        function updateStatusText() {
+            if (isRecording) { status.innerText = t('statusRecord'); return; }
+            if (isBackgroundRendering) return;
+            if (isAdjustMode) { status.innerText = t('statusAdjust'); return; }
+            if (isSpriteLoaded) { status.innerText = t('statusReady'); return; }
+            status.innerText = t('statusWait');
+        }
+
+        function updateSyncButtonsText() {
+            if (currentAdjustTarget === 'idle') {
+                btnSyncToOther.innerText = t('syncToActive');
+                btnSyncFromOther.innerText = t('syncFromActive');
+            } else {
+                btnSyncToOther.innerText = t('syncToIdle');
+                btnSyncFromOther.innerText = t('syncFromIdle');
+            }
+        }
+
+        function updateValueDisplays() {
+            const targetData = currentAdjustTarget === 'idle' ? idleAdjust : activeAdjust;
+            document.getElementById('val-scale').innerText = targetData.scale.toFixed(2);
+            document.getElementById('val-x').innerText = targetData.x.toFixed(0);
+            document.getElementById('val-y').innerText = targetData.y.toFixed(0);
+            document.getElementById('val-handScale').innerText = handScale.toFixed(2);
+            document.getElementById('val-handX').innerText = handX.toFixed(0);
+            document.getElementById('val-handY').innerText = handY.toFixed(0);
+            document.getElementById('val-squish').innerText = squishIntensity.toFixed(2);
+            document.getElementById('val-speed').innerText = petSpeed.toFixed(2);
+        }
+
+        function updateAdjustUI() {
+            const targetData = currentAdjustTarget === 'idle' ? idleAdjust : activeAdjust;
+            scaleSlider.value = targetData.scale;
+            xSlider.value = targetData.x;
+            ySlider.value = targetData.y;
+            // 手部拉桿對應全局變數
+            handScaleSlider.value = handScale;
+            handXSlider.value = handX;
+            handYSlider.value = handY;
+            squishSlider.value = squishIntensity;
+            speedSlider.value = petSpeed;
+            keepRatioCheck.checked = targetData.keepRatio;
+
+            updateValueDisplays(); // 同步顯示數字
+
+            if (isAdjustMode) {
+                petImageInner.src = currentAdjustTarget === 'idle' ? idleImgObj.src : activeImgObj.src;
+                updatePetImageTransform();
+                updateHandTransformStatic();
+                petImageInner.style.objectFit = targetData.keepRatio ? 'contain' : 'cover'; // 編輯模式同步 objectFit
+            } else {
+                // 確保網頁一載入（非編輯模式下），立刻套用完美預設值
+                if (!isPetting) {
+                    petImageInner.src = idleImgObj.src;
+                    petImageInner.style.transform = `translate(${idleAdjust.x}px, ${idleAdjust.y}px) scale(${idleAdjust.scale})`;
+                    petImageInner.style.objectFit = idleAdjust.keepRatio ? 'contain' : 'cover';
+                }
+            }
+        }
+
+        // 初始化時套用預設值設定
+        updateAdjustUI();
+        updateTexts(); // 這個要在上面執行完畢，否則可能會有顯示落差
+
+        // 🎵 初始化預設音樂 (現在由開場閘門來負責解鎖，這邊只負責載入資源)
+        if (DEFAULT_BGM.trim() !== "") {
+            bgmAudio.crossOrigin = "anonymous";
+            bgmAudio.src = DEFAULT_BGM;
+            isAudioLoaded = true;
+            document.getElementById('btnAudio').classList.add('success');
+            document.getElementById('btnAudio').innerText = currentLang === 'tw' ? "音樂已載入 🎵" : (currentLang === 'en' ? "Music Loaded 🎵" : "音楽がロードされました 🎵");
+            document.getElementById('btnRemoveAudio').style.display = 'flex';
+        }
+
+        // 動態按鈕功能綁定
+        btnResetAdjust.addEventListener('click', () => {
+            if (currentAdjustTarget === 'idle') {
+                Object.assign(idleAdjust, BACKUP_IDLE_ADJUST);
+            } else {
+                Object.assign(activeAdjust, BACKUP_ACTIVE_ADJUST);
+            }
+            // 🌟 完美備份還原：連同手部和動畫數值一起歸位！
+            handScale = BACKUP_HAND.scale;
+            handX = BACKUP_HAND.x;
+            handY = BACKUP_HAND.y;
+            squishIntensity = BACKUP_ANIMATION.squish;
+            petSpeed = BACKUP_ANIMATION.speed;
+
+            updateAdjustUI();
+        });
+
+        btnSyncToOther.addEventListener('click', () => {
+            const sourceData = currentAdjustTarget === 'idle' ? idleAdjust : activeAdjust;
+            const destData = currentAdjustTarget === 'idle' ? activeAdjust : idleAdjust;
+            Object.assign(destData, sourceData); // 僅複製圖片本身的 scale, x, y, keepRatio
+        });
+
+        btnSyncFromOther.addEventListener('click', () => {
+            const sourceData = currentAdjustTarget === 'idle' ? activeAdjust : idleAdjust;
+            const destData = currentAdjustTarget === 'idle' ? idleAdjust : activeAdjust;
+            Object.assign(destData, sourceData); // 僅複製圖片本身的 scale, x, y, keepRatio
+            updateAdjustUI();
+        });
+
+        adjustModeCheck.addEventListener('change', e => {
+            isAdjustMode = e.target.checked;
+            adjustTools.style.display = isAdjustMode ? 'flex' : 'none';
+            adjustTip.style.display = isAdjustMode ? 'none' : 'block';
+
+            updateTexts();
+
+            if (isAdjustMode) adjustSwitchContainer.classList.add('active');
+            else adjustSwitchContainer.classList.remove('active');
+
+            if (isAdjustMode) {
+                playground.style.cursor = 'move';
+                if (isPetting) stopPetting();
+                updateAdjustUI();
+
+                if (isSpriteLoaded) {
+                    handContainer.style.display = 'block';
+                    handSprite.style.transform = `translateX(0%)`;
+                    updateHandTransformStatic();
+                    handContainer.style.opacity = '0.7';
+                }
+            } else {
+                playground.style.cursor = 'none';
+                petImageInner.src = idleImgObj.src;
+                petImageInner.style.transform = `translate(${idleAdjust.x}px, ${idleAdjust.y}px) scale(${idleAdjust.scale})`;
+                petImageInner.style.objectFit = idleAdjust.keepRatio ? 'contain' : 'cover';
+                handContainer.style.display = 'none';
+                handContainer.style.opacity = '1';
+            }
+            updateStatusText();
+        });
+
+        keepRatioCheck.addEventListener('change', e => {
+            const targetData = currentAdjustTarget === 'idle' ? idleAdjust : activeAdjust;
+            targetData.keepRatio = e.target.checked;
+            petImageInner.style.objectFit = e.target.checked ? 'contain' : 'cover';
+        });
+
+        handScaleSlider.addEventListener('input', e => {
+            handScale = parseFloat(e.target.value);
+            document.getElementById('val-handScale').innerText = handScale.toFixed(2);
+            if (isAdjustMode) updateHandTransformStatic();
+        });
+        handXSlider.addEventListener('input', e => {
+            handX = parseFloat(e.target.value);
+            document.getElementById('val-handX').innerText = handX.toFixed(0);
+            if (isAdjustMode) updateHandTransformStatic();
+        });
+        handYSlider.addEventListener('input', e => {
+            handY = parseFloat(e.target.value);
+            document.getElementById('val-handY').innerText = handY.toFixed(0);
+            if (isAdjustMode) updateHandTransformStatic();
+        });
+
+        speedSlider.addEventListener('input', e => {
+            petSpeed = parseFloat(e.target.value);
+            document.getElementById('val-speed').innerText = petSpeed.toFixed(2);
+        });
+        squishSlider.addEventListener('input', e => {
+            squishIntensity = parseFloat(e.target.value);
+            document.getElementById('val-squish').innerText = squishIntensity.toFixed(2);
+        });
+
+        adjustRadios.forEach(radio => {
+            radio.addEventListener('change', e => {
+                currentAdjustTarget = e.target.value;
+                updateAdjustUI();
+                updateSyncButtonsText();
+            });
+        });
+
+        function updatePetImageTransform() {
+            const targetData = currentAdjustTarget === 'idle' ? idleAdjust : activeAdjust;
+            targetData.scale = parseFloat(scaleSlider.value);
+            targetData.x = parseFloat(xSlider.value);
+            targetData.y = parseFloat(ySlider.value);
+            petImageInner.style.transform = `translate(${targetData.x}px, ${targetData.y}px) scale(${targetData.scale})`;
+
+            document.getElementById('val-scale').innerText = targetData.scale.toFixed(2);
+            document.getElementById('val-x').innerText = targetData.x.toFixed(0);
+            document.getElementById('val-y').innerText = targetData.y.toFixed(0);
+        }
+
+        scaleSlider.addEventListener('input', updatePetImageTransform);
+        xSlider.addEventListener('input', updatePetImageTransform);
+        ySlider.addEventListener('input', updatePetImageTransform);
+
+        async function initGifWorker() {
+            try {
+                const res = await fetch('https://cdn.jsdelivr.net/npm/gif.js/dist/gif.worker.js');
+                const text = await res.text();
+                const blob = new Blob([text], { type: 'application/javascript' });
+                workerBlobUrl = URL.createObjectURL(blob);
+            } catch (err) {
+                workerBlobUrl = 'https://cdn.jsdelivr.net/npm/gif.js/dist/gif.worker.js';
+            }
+        }
+        initGifWorker();
+
+        function initAudioEngine() {
+            if (!audioCtx && isAudioLoaded) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                audioSourceNode = audioCtx.createMediaElementSource(bgmAudio);
+                gainNode = audioCtx.createGain();
+                gainNode.gain.value = currentVolume;
+                audioSourceNode.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+            }
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        bgmAudio.addEventListener('ended', () => {
+            if (isRecording && autoStopCheck.checked) {
+                isStoppedByAudioEnd = true;
+                btnToggleRecord.click();
+                return;
+            }
+            isInBgmGap = true;
+            bgmLoopTimeout = setTimeout(() => {
+                isInBgmGap = false;
+                if (isPetting || isBackgroundRendering) {
+                    bgmAudio.currentTime = 0;
+                    bgmAudio.play().catch(() => { });
+                }
+            }, 1500);
+        });
+
+        function drawUserImage(ctx, img, x, y, w, h, radius = 0, scale = 1, offsetX = 0, offsetY = 0, isContain = false) {
+            ctx.save();
+            if (radius > 0) {
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + w - radius, y);
+                ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+                ctx.lineTo(x + w, y + h - radius);
+                ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+                ctx.lineTo(x + radius, y + h);
+                ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+                ctx.clip();
+            }
+            const imgW = img.naturalWidth || img.width;
+            const imgH = img.naturalHeight || img.height;
+            if (!imgW || !imgH) { ctx.restore(); return; }
+            const imgRatio = imgW / imgH;
+            const targetRatio = w / h;
+            let drawW, drawH;
+            if (isContain) {
+                if (imgRatio > targetRatio) { drawW = w; drawH = w / imgRatio; }
+                else { drawH = h; drawW = h * imgRatio; }
+            } else {
+                if (imgRatio > targetRatio) { drawH = h; drawW = h * imgRatio; }
+                else { drawW = w; drawH = w / imgRatio; }
+            }
+            ctx.translate(x + w / 2, y + h / 2);
+            ctx.translate(offsetX, offsetY);
+            ctx.scale(scale, scale);
+            ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+            ctx.restore();
+        }
+
+        document.getElementById('idleImageUpload').addEventListener('change', e => {
+            if (e.target.files[0]) {
+                if (uploadedIdleUrl) URL.revokeObjectURL(uploadedIdleUrl);
+                uploadedIdleUrl = URL.createObjectURL(e.target.files[0]);
+                idleImgObj.src = uploadedIdleUrl;
+                if (!isAdjustMode || currentAdjustTarget === 'idle') petImageInner.src = uploadedIdleUrl;
+                document.getElementById('btnIdleFace').classList.add('success');
+            }
+        });
+        document.getElementById('activeImageUpload').addEventListener('change', e => {
+            if (e.target.files[0]) {
+                if (uploadedActiveUrl) URL.revokeObjectURL(uploadedActiveUrl);
+                uploadedActiveUrl = URL.createObjectURL(e.target.files[0]);
+                activeImgObj.src = uploadedActiveUrl;
+                if (isAdjustMode && currentAdjustTarget === 'active') petImageInner.src = uploadedActiveUrl;
+                document.getElementById('btnActiveFace').classList.add('success');
+            }
+        });
+
+        // 上傳音樂與刪除音樂
+        document.getElementById('audioUpload').addEventListener('change', e => {
+            if (e.target.files[0]) {
+                if (uploadedAudioUrl) URL.revokeObjectURL(uploadedAudioUrl);
+                uploadedAudioUrl = URL.createObjectURL(e.target.files[0]);
+                bgmAudio.src = uploadedAudioUrl;
+                isAudioLoaded = true;
+                document.getElementById('btnAudio').classList.add('success');
+                document.getElementById('btnAudio').innerText = currentLang === 'tw' ? "音樂已載入 🎵" : (currentLang === 'en' ? "Music Loaded 🎵" : "音楽がロードされました 🎵");
+                document.getElementById('btnRemoveAudio').style.display = 'flex';
+            }
+        });
+
+        document.getElementById('btnRemoveAudio').addEventListener('click', () => {
+            bgmAudio.src = "";
+            bgmAudio.removeAttribute('src');
+            isAudioLoaded = false;
+            document.getElementById('audioUpload').value = "";
+            const btnAudio = document.getElementById('btnAudio');
+            btnAudio.classList.remove('success');
+            btnAudio.innerText = t('uploadAudio');
+            document.getElementById('btnRemoveAudio').style.display = 'none';
+        });
+
+        document.getElementById('btnSwapImages').addEventListener('click', () => {
+            const tempSrc = idleImgObj.src;
+            idleImgObj.src = activeImgObj.src;
+            activeImgObj.src = tempSrc;
+
+            // 連同「記憶體裡的虛擬網址標籤」一起交換
+            const tempUrl = uploadedIdleUrl;
+            uploadedIdleUrl = uploadedActiveUrl;
+            uploadedActiveUrl = tempUrl;
+
+            const btnIdle = document.getElementById('btnIdleFace');
+            const btnActive = document.getElementById('btnActiveFace');
+            const idleHasSuccess = btnIdle.classList.contains('success');
+            const activeHasSuccess = btnActive.classList.contains('success');
+            if (idleHasSuccess !== activeHasSuccess) {
+                btnIdle.classList.toggle('success');
+                btnActive.classList.toggle('success');
+            }
+
+            updateAdjustUI();
+
+            if (!isAdjustMode && !isPetting) {
+                petImageInner.src = idleImgObj.src;
+            }
+        });
+
+        const squishFrames = [
+            { w: 1.00, h: 1.00, x: 0, y: 0 }, { w: 1.02, h: 0.90, x: -2, y: 12 },
+            { w: 1.05, h: 0.75, x: -6, y: 24 }, { w: 1.03, h: 0.85, x: -4, y: 16 }, { w: 1.01, h: 0.95, x: -2, y: 4 }
+        ];
+
+        function updateDirection(e) {
+            if (!e || isAdjustMode) return;
+            let clientX = e.type.startsWith('touch') ? (e.touches[0] ? e.touches[0].clientX : null) : e.clientX;
+            if (clientX === null) return;
+            const rect = playground.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const currentSide = clientX < centerX ? 'left' : 'right';
+            if (currentSide !== lastMouseSide) {
+                lastMouseSide = currentSide;
+                flipMultiplier = (currentSide === 'left') ? 1 : -1;
+                if (isRecording && isPetting) sessionLog.push({ time: performance.now() - recordStartTime, state: 'start', flip: flipMultiplier, speed: petSpeed, squish: squishIntensity });
+            }
+        }
+
+        function startPetting(e) {
+            if (isAdjustMode) return;
+            if (e && e.type === 'touchstart') e.preventDefault();
+            if (!isSpriteLoaded) return;
+            updateDirection(e);
+            if (isPetting) return;
+
+            isPetting = true;
+            handContainer.style.display = 'block';
+            petImageInner.src = activeImgObj.src;
+            petImageInner.style.transform = `translate(${activeAdjust.x}px, ${activeAdjust.y}px) scale(${activeAdjust.scale})`;
+            petImageInner.style.objectFit = activeAdjust.keepRatio ? 'contain' : 'cover';
+            if (isAudioLoaded) { initAudioEngine(); if (bgmAudio.paused && !isInBgmGap) bgmAudio.play().catch(() => { }); }
+
+            if (isRecording) sessionLog.push({ time: performance.now() - recordStartTime, state: 'start', flip: flipMultiplier, speed: petSpeed, squish: squishIntensity });
+
+            lastFrameTime = performance.now();
+            updateAnimation(performance.now());
+        }
+
+        function updateAnimation(now) {
+            if (!isPetting) return;
+
+            let frameDuration = 60 / petSpeed;
+            if (now - lastFrameTime >= frameDuration) {
+                currentFrame = (currentFrame + 1) % 5;
+                handSprite.style.transform = `translateX(-${currentFrame * 20}%)`;
+                lastFrameTime = now;
+            }
+
+            smoothedFlip += (flipMultiplier - smoothedFlip) * 0.15;
+            updateHandTransformStatic();
+
+            const sq = squishFrames[currentFrame];
+
+            const actualH = 1.0 - ((1.0 - sq.h) * squishIntensity);
+            const actualW = 1.0 + ((sq.w - 1.0) * squishIntensity);
+            const actualTy = sq.y * squishIntensity;
+            const actualTx = sq.x * squishIntensity;
+
+            petTarget.style.transform = `translate(${actualTx * smoothedFlip * -1}px, ${actualTy}px) scale(${actualW}, ${actualH})`;
+            renderReq = requestAnimationFrame(updateAnimation);
+        }
+
+        function stopPetting(e) {
+            if (isAdjustMode) return;
+            if (e && e.type.startsWith('touch')) e.preventDefault();
+            if (!isPetting) return;
+
+            isPetting = false;
+            if (renderReq) cancelAnimationFrame(renderReq);
+            currentFrame = 0;
+
+            if (bgmLoopTimeout) { clearTimeout(bgmLoopTimeout); bgmLoopTimeout = null; }
+            isInBgmGap = false;
+            if (isAudioLoaded) bgmAudio.pause();
+
+            handContainer.style.display = 'none'; handSprite.style.transform = `translateX(0%)`;
+            petTarget.style.transform = `translate(0px, 0px) scale(1, 1)`;
+            petImageInner.src = idleImgObj.src;
+            petImageInner.style.transform = `translate(${idleAdjust.x}px, ${idleAdjust.y}px) scale(${idleAdjust.scale})`;
+            petImageInner.style.objectFit = idleAdjust.keepRatio ? 'contain' : 'cover';
+            lastMouseSide = null;
+
+            if (isRecording) sessionLog.push({ time: performance.now() - recordStartTime, state: 'stop', flip: flipMultiplier, speed: petSpeed, squish: squishIntensity });
+        }
+
+        playground.addEventListener('mousedown', e => {
+            if (isAdjustMode) {
+                isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY;
+                const targetData = currentAdjustTarget === 'idle' ? idleAdjust : activeAdjust;
+                startOffsetX = targetData.x; startOffsetY = targetData.y;
+            }
+        });
+        window.addEventListener('mouseup', () => { if (isAdjustMode) isDragging = false; });
+        playground.addEventListener('mousemove', e => {
+            if (isAdjustMode) {
+                if (isDragging) {
+                    const targetData = currentAdjustTarget === 'idle' ? idleAdjust : activeAdjust;
+                    targetData.x = startOffsetX + (e.clientX - dragStartX);
+                    targetData.y = startOffsetY + (e.clientY - dragStartY);
+                    xSlider.value = targetData.x; ySlider.value = targetData.y;
+                    updatePetImageTransform();
+                }
+            } else { updateDirection(e); }
+        });
+        playground.addEventListener('wheel', e => {
+            if (isAdjustMode) {
+                e.preventDefault();
+                const zoomIntensity = 0.05;
+                const targetData = currentAdjustTarget === 'idle' ? idleAdjust : activeAdjust;
+                targetData.scale += (e.deltaY < 0 ? zoomIntensity : -zoomIntensity);
+                targetData.scale = Math.max(0.1, Math.min(targetData.scale, 5));
+                scaleSlider.value = targetData.scale;
+                updatePetImageTransform();
+            }
+        }, { passive: false });
+        playground.addEventListener('touchstart', e => {
+            if (isAdjustMode) {
+                e.preventDefault(); isDragging = true;
+                const targetData = currentAdjustTarget === 'idle' ? idleAdjust : activeAdjust;
+                if (e.touches.length === 1) {
+                    dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
+                    startOffsetX = targetData.x; startOffsetY = targetData.y;
+                } else if (e.touches.length === 2) {
+                    initialDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                    initialScale = targetData.scale;
+                }
+            } else { startPetting(e); }
+        }, { passive: false });
+        playground.addEventListener('touchmove', e => {
+            if (isAdjustMode) {
+                e.preventDefault();
+                const targetData = currentAdjustTarget === 'idle' ? idleAdjust : activeAdjust;
+                if (e.touches.length === 1 && isDragging) {
+                    targetData.x = startOffsetX + (e.touches[0].clientX - dragStartX);
+                    targetData.y = startOffsetY + (e.touches[0].clientY - dragStartY);
+                    xSlider.value = targetData.x; ySlider.value = targetData.y;
+                    updatePetImageTransform();
+                } else if (e.touches.length === 2) {
+                    const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                    if (initialDistance) {
+                        targetData.scale = initialScale * (dist / initialDistance);
+                        targetData.scale = Math.max(0.1, Math.min(targetData.scale, 5));
+                        scaleSlider.value = targetData.scale;
+                        updatePetImageTransform();
+                    }
+                }
+            } else { updateDirection(e); }
+        }, { passive: false });
+        playground.addEventListener('touchend', e => { if (isAdjustMode) { if (e.touches.length < 2) initialDistance = 0; if (e.touches.length === 0) isDragging = false; } else { stopPetting(e); } }, { passive: false });
+        playground.addEventListener('touchcancel', e => { if (isAdjustMode) { isDragging = false; initialDistance = 0; } else { stopPetting(e); } }, { passive: false });
+        playground.addEventListener('mouseenter', e => { if (!isAdjustMode) startPetting(e); });
+        playground.addEventListener('mouseleave', e => { if (isAdjustMode) isDragging = false; else stopPetting(e); });
+        window.addEventListener('keydown', e => { if (!isPetting || isAdjustMode) return; if (e.key === 'ArrowLeft') { if (lastMouseSide === 'left') return; flipMultiplier = 1; lastMouseSide = 'left'; if (isRecording) sessionLog.push({ time: performance.now() - recordStartTime, state: 'start', flip: flipMultiplier, speed: petSpeed, squish: squishIntensity }); } else if (e.key === 'ArrowRight') { if (lastMouseSide === 'right') return; flipMultiplier = -1; lastMouseSide = 'right'; if (isRecording) sessionLog.push({ time: performance.now() - recordStartTime, state: 'start', flip: flipMultiplier, speed: petSpeed, squish: squishIntensity }); } });
+
+        btnToggleRecord.addEventListener('click', () => {
+            initAudioEngine();
+
+            if (!isRecording) {
+                isRecording = true; recordStartTime = performance.now(); sessionLog = [];
+                isStoppedByAudioEnd = false;
+                if (isAudioLoaded) { bgmAudio.currentTime = 0; if (bgmLoopTimeout) { clearTimeout(bgmLoopTimeout); bgmLoopTimeout = null; } isInBgmGap = false; if (isPetting && bgmAudio.paused) bgmAudio.play().catch(() => { }); }
+                sessionLog.push({ time: 0, state: isPetting ? 'start' : 'stop', flip: smoothedFlip, speed: petSpeed, squish: squishIntensity });
+
+                btnToggleRecord.classList.add('recording');
+                document.body.classList.add('is-recording');
+
+                let timeLeft = maxRecordTime;
+                btnToggleRecord.innerText = t('stopRecord') + ` (${Math.ceil(timeLeft / 1000)}s)`;
+                updateStatusText();
+
+                recordInterval = setInterval(() => {
+                    let elapsed = performance.now() - recordStartTime;
+                    timeLeft = maxRecordTime - elapsed;
+
+                    if (timeLeft <= 0) {
+                        clearInterval(recordInterval);
+                        recordInterval = null;
+                        if (isRecording) btnToggleRecord.click();
+                    } else {
+                        btnToggleRecord.innerText = t('stopRecord') + ` (${Math.ceil(timeLeft / 1000)}s)`;
+                    }
+                }, 100);
+
+            } else {
+                isRecording = false;
+                let totalDuration = performance.now() - recordStartTime;
+                if (totalDuration > maxRecordTime) totalDuration = maxRecordTime;
+
+                sessionLog.push({ time: totalDuration, state: 'end', flip: flipMultiplier, speed: petSpeed, squish: squishIntensity });
+
+                if (recordInterval) {
+                    clearInterval(recordInterval);
+                    recordInterval = null;
+                }
+
+                btnToggleRecord.classList.remove('recording');
+                btnToggleRecord.disabled = true;
+
+                if (selectedFormat === 'gif') {
+                    status.innerText = t('statusProcessGif');
+                    startBackgroundRenderGIF(totalDuration);
+                } else {
+                    status.innerText = t('statusProcessWebm');
+                    isBackgroundRendering = true;
+                    startBackgroundRender(totalDuration, isStoppedByAudioEnd);
+                }
+            }
+        });
+
+        // 渲染遮罩與進度控制函式
+        function showRenderProgress() {
+            renderOverlay.style.display = 'flex';
+            progressBar.style.width = '0%';
+            progressText.innerText = '0%';
+        }
+
+        function updateRenderProgress(percent) {
+            let p = Math.max(0, Math.min(100, Math.round(percent)));
+            progressBar.style.width = p + '%';
+            progressText.innerText = p + '%';
+        }
+
+        function hideRenderProgress() {
+            renderOverlay.style.display = 'none';
+        }
+
+        // 定義 WebM 放大常數
+        const RENDER_SCALE = 1080 / 250;
+        const GIF_SCALE = 480 / 250;
+
+        function startBackgroundRender(totalDuration, waitForAudioEnd) {
+            showRenderProgress(); // 顯示全螢幕進度遮罩
+
+            if (lastGeneratedWebmUrl) {
+                URL.revokeObjectURL(lastGeneratedWebmUrl);
+                lastGeneratedWebmUrl = null;
+            }
+
+            const canvas = document.getElementById('renderCanvas');
+            canvas.width = 1080;
+            canvas.height = 1080;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#18181b';
+            ctx.fillRect(0, 0, 1080, 1080);
+            ctx.save();
+            ctx.scale(RENDER_SCALE, RENDER_SCALE);
+            let firstState = sessionLog.length > 0 ? sessionLog[0] : { state: 'stop', flip: 1 };
+            let targetImg = (firstState.state === 'start') ? activeImgObj : idleImgObj;
+            let currentAdjust = (firstState.state === 'start') ? activeAdjust : idleAdjust;
+            ctx.translate(125, 250);
+            drawUserImage(ctx, targetImg, -100, -200, 200, 200, 0, currentAdjust.scale, currentAdjust.x, currentAdjust.y, currentAdjust.keepRatio);
+            ctx.restore();
+
+            if (firstState.state === 'start') {
+                let initFlip = firstState.flip || 1;
+                ctx.save();
+                ctx.translate(125 + handX * initFlip, 125 + handY);
+                ctx.scale(initFlip * handScale, 1 * handScale);
+                ctx.translate(-125, -125);
+                let frameW = handSpriteObj.width / 5;
+                ctx.drawImage(handSpriteObj, 2, 0, frameW - 4, handSpriteObj.height, -2, 0, 254, 250);
+                ctx.restore();
+            }
+
+            const canvasStream = canvas.captureStream(60);
+            let combinedStream = canvasStream;
+            let tempDestNode = null;
+
+            if (isAudioLoaded && audioCtx && audioSourceNode) {
+                tempDestNode = audioCtx.createMediaStreamDestination();
+                if (gainNode) {
+                    gainNode.connect(tempDestNode);
+                } else {
+                    audioSourceNode.connect(tempDestNode);
+                }
+                combinedStream = new MediaStream([...canvasStream.getTracks(), ...tempDestNode.stream.getTracks()]);
+            }
+
+            const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm', videoBitsPerSecond: 8000000 });
+            const chunks = [];
+            recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+
+                lastGeneratedWebmUrl = url;
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'petpet_1080p.webm';
+                a.click();
+
+                isBackgroundRendering = false;
+                status.innerText = t('statusDone');
+                document.body.classList.remove('is-recording');
+                hideRenderProgress();
+
+                btnToggleRecord.innerText = t('startRecord');
+                btnToggleRecord.disabled = false;
+
+                if (tempDestNode) {
+                    if (gainNode) {
+                        gainNode.disconnect(tempDestNode);
+                    } else {
+                        audioSourceNode.disconnect(tempDestNode);
+                    }
+                    tempDestNode.stream.getTracks().forEach(t => t.stop());
+                }
+            };
+
+            if (bgmLoopTimeout) { clearTimeout(bgmLoopTimeout); bgmLoopTimeout = null; }
+            isInBgmGap = false;
+            recorder.start();
+
+            const videoTrack = canvasStream.getVideoTracks()[0];
+            if (videoTrack && videoTrack.requestFrame) videoTrack.requestFrame();
+
+            if (isAudioLoaded) { bgmAudio.currentTime = 0; bgmAudio.play(); }
+
+            let playStartTime = performance.now();
+            let smoothedFlipRender = sessionLog.length > 0 ? sessionLog[0].flip : 1;
+            let actualAudioEndTime = 0;
+
+            function renderFrame(now) {
+                let elapsed = now - playStartTime;
+
+                let p = totalDuration > 0 ? (elapsed / totalDuration) * 100 : 100;
+                updateRenderProgress(p);
+
+                let activeEvent = sessionLog[0];
+                let accumulatedFrames = 0;
+                let tempIsPetting = false;
+                let tempLastStart = 0;
+                let tempSpeed = 1;
+                let tempSquish = 1;
+
+                for (let i = 0; i < sessionLog.length; i++) {
+                    let ev = sessionLog[i];
+                    if (ev.time <= elapsed) {
+                        activeEvent = ev;
+                        if (ev.state === 'start' && !tempIsPetting) {
+                            tempIsPetting = true; tempLastStart = ev.time;
+                            tempSpeed = ev.speed || 1;
+                            tempSquish = ev.squish !== undefined ? ev.squish : 1;
+                        } else if (ev.state === 'stop' && tempIsPetting) {
+                            tempIsPetting = false;
+                            accumulatedFrames += (ev.time - tempLastStart) / (60 / tempSpeed);
+                        }
+                    } else { break; }
+                }
+
+                if (tempIsPetting) {
+                    accumulatedFrames += (elapsed - tempLastStart) / (60 / tempSpeed);
+                    tempSquish = activeEvent.squish !== undefined ? activeEvent.squish : 1;
+                }
+
+                let currentState = activeEvent.state;
+                let targetFlip = activeEvent.flip;
+
+                if (currentState === 'end') {
+                    for (let i = sessionLog.length - 1; i >= 0; i--) {
+                        if (sessionLog[i].state === 'start' || sessionLog[i].state === 'stop') { currentState = sessionLog[i].state; break; }
+                    }
+                }
+
+                smoothedFlipRender += (targetFlip - smoothedFlipRender) * 0.15;
+
+                ctx.fillStyle = '#18181b'; ctx.fillRect(0, 0, 1080, 1080);
+                ctx.save();
+                ctx.scale(RENDER_SCALE, RENDER_SCALE);
+
+                let targetImg = (currentState === 'start') ? activeImgObj : idleImgObj;
+                let currentAdjust = (currentState === 'start') ? activeAdjust : idleAdjust;
+
+                if (isAudioLoaded) {
+                    if (currentState === 'start') { if (bgmAudio.paused && !isInBgmGap) bgmAudio.play().catch(() => { }); }
+                    else { if (!bgmAudio.paused) bgmAudio.pause(); if (bgmLoopTimeout) { clearTimeout(bgmLoopTimeout); bgmLoopTimeout = null; } isInBgmGap = false; }
+                }
+
+                if (currentState === 'start') {
+                    let currentPetFrame = Math.floor(accumulatedFrames) % 5;
+                    let sq = squishFrames[currentPetFrame];
+
+                    const actualH = 1.0 - ((1.0 - sq.h) * tempSquish);
+                    const actualW = 1.0 + ((sq.w - 1.0) * tempSquish);
+                    const actualTy = sq.y * tempSquish;
+                    const actualTx = sq.x * tempSquish;
+
+                    ctx.save();
+                    ctx.translate(125 + (actualTx * smoothedFlipRender * -1), 250 + actualTy);
+                    ctx.scale(actualW, actualH);
+                    drawUserImage(ctx, targetImg, -100, -200, 200, 200, 0, currentAdjust.scale, currentAdjust.x, currentAdjust.y, currentAdjust.keepRatio);
+                    ctx.restore();
+
+                    ctx.save();
+                    ctx.translate(125 + handX * smoothedFlipRender, 125 + handY);
+                    ctx.scale(smoothedFlipRender * handScale, 1 * handScale);
+                    ctx.translate(-125, -125);
+                    let frameW = handSpriteObj.width / 5;
+                    ctx.drawImage(handSpriteObj, (currentPetFrame * frameW) + 2, 0, frameW - 4, handSpriteObj.height, -2, 0, 254, 250);
+                    ctx.restore();
+                } else {
+                    ctx.save();
+                    ctx.translate(125, 250);
+                    drawUserImage(ctx, targetImg, -100, -200, 200, 200, 0, currentAdjust.scale, currentAdjust.x, currentAdjust.y, currentAdjust.keepRatio);
+                    ctx.restore();
+                }
+
+                ctx.restore();
+
+                let shouldStop = false;
+                if (waitForAudioEnd && isAudioLoaded) {
+                    if (bgmAudio.ended) { if (actualAudioEndTime === 0) actualAudioEndTime = elapsed; if (elapsed >= totalDuration && elapsed > actualAudioEndTime + 400) shouldStop = true; }
+                    else if (elapsed > totalDuration + 3000) { shouldStop = true; }
+                } else { if (elapsed >= totalDuration + 400) shouldStop = true; }
+
+                if (!shouldStop) { requestAnimationFrame(renderFrame); }
+                else { recorder.stop(); if (isAudioLoaded) bgmAudio.pause(); if (bgmLoopTimeout) { clearTimeout(bgmLoopTimeout); bgmLoopTimeout = null; } isInBgmGap = false; }
+            }
+            requestAnimationFrame(renderFrame);
+        }
+
+        function startBackgroundRenderGIF(totalDuration) {
+            showRenderProgress();
+
+            if (lastGeneratedGifUrl) {
+                URL.revokeObjectURL(lastGeneratedGifUrl);
+                lastGeneratedGifUrl = null;
+            }
+
+            setTimeout(async () => {
+                const canvas = document.getElementById('renderCanvas');
+                canvas.width = 480;
+                canvas.height = 480;
+                const ctx = canvas.getContext('2d');
+
+                const workerCount = navigator.hardwareConcurrency ? Math.min(2, navigator.hardwareConcurrency - 1) : 2;
+
+                const gif = new GIF({
+                    workers: workerCount,
+                    quality: 10,
+                    width: 480,
+                    height: 480,
+                    transparent: 0x000001,
+                    workerScript: workerBlobUrl
+                });
+
+                gif.on('progress', function (p) {
+                    updateRenderProgress(p * 100);
+                });
+
+                let smoothedFlipRender = sessionLog.length > 0 ? sessionLog[0].flip : 1;
+                const frameDelay = 20;
+
+                for (let elapsed = 0; elapsed <= totalDuration; elapsed += frameDelay) {
+                    let activeEvent = sessionLog[0];
+                    let accumulatedFrames = 0;
+                    let tempIsPetting = false;
+                    let tempLastStart = 0;
+                    let tempSpeed = 1;
+                    let tempSquish = 1;
+
+                    for (let i = 0; i < sessionLog.length; i++) {
+                        let ev = sessionLog[i];
+                        if (ev.time <= elapsed) {
+                            activeEvent = ev;
+                            if (ev.state === 'start' && !tempIsPetting) {
+                                tempIsPetting = true; tempLastStart = ev.time;
+                                tempSpeed = ev.speed || 1;
+                                tempSquish = ev.squish !== undefined ? ev.squish : 1;
+                            } else if (ev.state === 'stop' && tempIsPetting) {
+                                tempIsPetting = false;
+                                accumulatedFrames += (ev.time - tempLastStart) / (60 / tempSpeed);
+                            }
+                        } else { break; }
+                    }
+
+                    if (tempIsPetting) {
+                        accumulatedFrames += (elapsed - tempLastStart) / (60 / tempSpeed);
+                        tempSquish = activeEvent.squish !== undefined ? activeEvent.squish : 1;
+                    }
+
+                    let currentState = activeEvent.state;
+                    let targetFlip = activeEvent.flip;
+
+                    if (currentState === 'end') {
+                        for (let i = sessionLog.length - 1; i >= 0; i--) {
+                            if (sessionLog[i].state === 'start' || sessionLog[i].state === 'stop') { currentState = sessionLog[i].state; break; }
+                        }
+                    }
+
+                    smoothedFlipRender += (targetFlip - smoothedFlipRender) * 0.25;
+
+                    ctx.clearRect(0, 0, 480, 480);
+                    ctx.save();
+                    ctx.imageSmoothingEnabled = true;
+
+                    ctx.scale(GIF_SCALE, GIF_SCALE);
+
+                    let targetImg = (currentState === 'start') ? activeImgObj : idleImgObj;
+                    let currentAdjust = (currentState === 'start') ? activeAdjust : idleAdjust;
+
+                    if (currentState === 'start') {
+                        let currentPetFrame = Math.floor(accumulatedFrames) % 5;
+                        let sq = squishFrames[currentPetFrame];
+
+                        const actualH = 1.0 - ((1.0 - sq.h) * tempSquish);
+                        const actualW = 1.0 + ((sq.w - 1.0) * tempSquish);
+                        const actualTy = sq.y * tempSquish;
+                        const actualTx = sq.x * tempSquish;
+
+                        ctx.save();
+                        ctx.translate(125 + (actualTx * smoothedFlipRender * -1), 250 + actualTy);
+                        ctx.scale(actualW, actualH);
+                        drawUserImage(ctx, targetImg, -100, -200, 200, 200, 0, currentAdjust.scale, currentAdjust.x, currentAdjust.y, currentAdjust.keepRatio);
+                        ctx.restore();
+
+                        ctx.save();
+                        ctx.translate(125 + handX * smoothedFlipRender, 125 + handY);
+                        ctx.scale(smoothedFlipRender * handScale, 1 * handScale);
+                        ctx.translate(-125, -125);
+                        let frameW = handSpriteObj.width / 5;
+                        ctx.drawImage(handSpriteObj, (currentPetFrame * frameW) + 2, 0, frameW - 4, handSpriteObj.height, -2, 0, 254, 250);
+                        ctx.restore();
+                    } else {
+                        ctx.save();
+                        ctx.translate(125, 250);
+                        drawUserImage(ctx, targetImg, -100, -200, 200, 200, 0, currentAdjust.scale, currentAdjust.x, currentAdjust.y, currentAdjust.keepRatio);
+                        ctx.restore();
+                    }
+
+                    ctx.restore();
+
+                    const imgData = ctx.getImageData(0, 0, 480, 480);
+                    const data = imgData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        if (data[i + 3] < 128) {
+                            data[i] = 0;
+                            data[i + 1] = 0;
+                            data[i + 2] = 1;
+                            data[i + 3] = 255;
+                        } else {
+                            data[i + 3] = 255;
+                            if (data[i] === 0 && data[i + 1] === 0 && data[i + 2] === 1) {
+                                data[i + 2] = 2;
+                            }
+                        }
+                    }
+                    ctx.putImageData(imgData, 0, 0);
+
+                    gif.addFrame(ctx, { copy: true, delay: frameDelay });
+
+                    if (elapsed > 0 && Math.round(elapsed / frameDelay) % 5 === 0) {
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                    }
+                }
+
+                gif.on('finished', function (blob) {
+                    const url = URL.createObjectURL(blob);
+
+                    lastGeneratedGifUrl = url;
+
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'petpet_480p.gif';
+                    a.click();
+
+                    document.body.classList.remove('is-recording');
+                    status.innerText = t('statusDone');
+                    hideRenderProgress();
+
+                    btnToggleRecord.innerText = t('startRecord');
+                    btnToggleRecord.disabled = false;
+                });
+                gif.render();
+            }, 100);
+        }
+    </script>
+</body>
+
+</html>
